@@ -167,6 +167,12 @@ mod visit;
 
 // Data types
 
+#[derive(Copy, Clone, Debug, HashStable, PartialEq, Eq)]
+pub enum ImportUse {
+    Scope,
+    Other,
+}
+
 #[derive(Debug, HashStable)]
 pub struct ResolverGlobalCtxt {
     pub visibilities_for_hashing: Vec<(LocalDefId, Visibility)>,
@@ -178,6 +184,8 @@ pub struct ResolverGlobalCtxt {
     pub module_children: LocalDefIdMap<Vec<ModChild>>,
     pub ambig_module_children: LocalDefIdMap<Vec<AmbigModChild>>,
     pub glob_map: FxIndexMap<LocalDefId, FxIndexSet<Symbol>>,
+    pub import_use_map: FxIndexMap<ast::NodeId, ImportUse>,
+    pub used_imports: FxIndexSet<ast::NodeId>,
     pub main_def: Option<MainDefinition>,
     pub trait_impls: FxIndexMap<DefId, Vec<LocalDefId>>,
     /// A list of proc macro LocalDefIds, written out in the order in which

@@ -69,7 +69,7 @@ use rustc_middle::middle::privacy::EffectiveVisibilities;
 use rustc_middle::query::Providers;
 use rustc_middle::span_bug;
 use rustc_middle::ty::{
-    self, DelegationFnSig, DelegationInfo, Feed, MainDefinition, RegisteredTools,
+    self, DelegationFnSig, DelegationInfo, Feed, ImportUse, MainDefinition, RegisteredTools,
     ResolverAstLowering, ResolverGlobalCtxt, TyCtxt, TyCtxtFeed, Visibility,
 };
 use rustc_query_system::ich::StableHashingContext;
@@ -237,6 +237,15 @@ enum ConstArgContext {
 enum Used {
     Scope,
     Other,
+}
+
+impl From<Used> for ImportUse {
+    fn from(used: Used) -> Self {
+        match used {
+            Used::Scope => ImportUse::Scope,
+            Used::Other => ImportUse::Other,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -1770,6 +1779,18 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
         let extern_crate_map = self.extern_crate_map;
         let maybe_unused_trait_imports = self.maybe_unused_trait_imports;
         let glob_map = self.glob_map;
+        let mut import_use_entries: Vec<(NodeId, ImportUse)> = self
+            .import_use_map
+            .into_iter()
+            .filter_map(|(import, used)| import.id().map(|id| (id, used.into())))
+            .collect();
+        import_use_entries.sort_by_key(|(id, _)| *id);
+        let import_use_map: FxIndexMap<NodeId, ImportUse> =
+            import_use_entries.into_iter().collect();
+
+        let mut used_imports: Vec<NodeId> = self.used_imports.into_iter().collect();
+        used_imports.sort_unstable();
+        let used_imports: FxIndexSet<NodeId> = used_imports.into_iter().collect();
         let main_def = self.main_def;
         let confused_type_with_std_module = self.confused_type_with_std_module;
         let effective_visibilities = self.effective_visibilities;
@@ -1792,6 +1813,8 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
             module_children: self.module_children,
             ambig_module_children: self.ambig_module_children,
             glob_map,
+            import_use_map,
+            used_imports,
             maybe_unused_trait_imports,
             main_def,
             trait_impls: self.trait_impls,
